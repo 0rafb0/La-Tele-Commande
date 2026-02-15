@@ -1,3 +1,5 @@
+La Tele Commande
+
 Application Android (smartphone) permettant de contrôler à distance une Smart TV Samsung comme une télécommande et accéder à des raccourcis tels que le volume, les flèches, le bouton OK, Home, Retour et des applications comme Netflix, Canal+, Prime Vidéo et autres
 
 1. Télécharger le fichier .apk : https://drive.google.com/file/d/1cDY6YKO6AxoY2-G81oB6lBr5-dti4BMF/view?usp=sharing

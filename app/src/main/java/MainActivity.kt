@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import okhttp3.*
@@ -27,33 +30,289 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
-    private lateinit var tvWebSocketManager: TVWebSocketManager
-    private val tvIp = "192.168.1.149" // Remplace par l'IP de ta TV
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tvWebSocketManager = TVWebSocketManager(tvIp)
 
         setContent {
             TeleCommandeAppTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF121212)) {
-                    TVRemoteScreen(tvWebSocketManager)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFF121212)
+                ) {
+                    TVRemoteApp()
                 }
             }
         }
     }
+}
 
-    override fun onDestroy() {
-        super.onDestroy()
-        tvWebSocketManager.disconnect()
+@Composable
+fun TVRemoteApp() {
+    var tvIp by remember { mutableStateOf(TextFieldValue("192.168.1.149")) }
+    var tvWebSocketManager: TVWebSocketManager? by remember { mutableStateOf(null) }
+    val context = LocalContext.current
+    var connectionStatus by remember { mutableStateOf("Non connecté") }
+    var connectionError by remember { mutableStateOf<String?>(null) }
+    var showControls by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Section de connexion
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            Text(
+                "Contrôle TV Samsung (WebSocket)",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = tvIp,
+                onValueChange = { tvIp = it },
+                label = { Text("Adresse IP de la TV", color = Color.White) },
+                placeholder = { Text("Ex: 192.168.1.149") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFF333333),
+                    unfocusedContainerColor = Color(0xFF333333),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedPlaceholderColor = Color.Gray,
+                    unfocusedPlaceholderColor = Color.Gray,
+                    focusedLabelColor = Color.White,
+                    unfocusedLabelColor = Color.Gray,
+                    focusedIndicatorColor = Color.Blue,
+                    unfocusedIndicatorColor = Color.Gray
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Statut : $connectionStatus",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (connectionStatus == "Connecté") Color.Green else Color.Red
+            )
+
+            if (connectionError != null) {
+                Text(
+                    "Erreur : $connectionError",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Red
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    if (tvWebSocketManager == null || !tvWebSocketManager!!.isConnected()) {
+                        tvWebSocketManager = TVWebSocketManager(tvIp.text)
+                        tvWebSocketManager?.setConnectionListener { isConnected, error ->
+                            connectionStatus = if (isConnected) "Connecté" else "Non connecté"
+                            connectionError = error
+                            showControls = isConnected
+                        }
+                        tvWebSocketManager?.connect()
+                        Toast.makeText(context, "Connexion en cours...", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Déjà connecté !", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333), contentColor = Color.White)
+            ) {
+                Text(if (tvWebSocketManager != null && tvWebSocketManager!!.isConnected()) "Reconnecter" else "Se connecter")
+            }
+        }
+
+        // Section des commandes (avec défilement)
+        if (showControls && tvWebSocketManager != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(2f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                TVRemoteScreen(tvWebSocketManager!!)
+            }
+        }
     }
 }
 
-class TVWebSocketManager(private val tvIp: String, private val name: String = "RC") {
+@Composable
+fun TVRemoteScreen(tvWebSocketManager: TVWebSocketManager) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text("Commandes de base :", style = MaterialTheme.typography.titleSmall, color = Color.White)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    Button(
+                        onClick = { tvWebSocketManager.sendCommand("KEY_VOLDOWN") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                    ) {
+                        Text("Volume -")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { tvWebSocketManager.sendCommand("KEY_VOLUP") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                    ) {
+                        Text("Volume +")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Button(
+                        onClick = { tvWebSocketManager.sendCommand("KEY_UP") },
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(60.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                    ) {
+                        Text("↑", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { tvWebSocketManager.sendCommand("KEY_LEFT") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(60.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                        ) {
+                            Text("←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { tvWebSocketManager.sendCommand("KEY_ENTER") },
+                            modifier = Modifier
+                                .height(55.dp)
+                                .padding(top = 5.dp, start = 2.5.dp, end = 2.5.dp, bottom = 2.5.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32), contentColor = Color.White)
+                        ) {
+                            Text("OK", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { tvWebSocketManager.sendCommand("KEY_RIGHT") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(60.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                        ) {
+                            Text("→", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Button(
+                        onClick = { tvWebSocketManager.sendCommand("KEY_DOWN") },
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(60.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
+                    ) {
+                        Text("↓", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { tvWebSocketManager.sendCommand("KEY_HOME") },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700), contentColor = Color.Black)
+            ) {
+                Text("Accueil")
+            }
+            Button(
+                onClick = { tvWebSocketManager.sendCommand("KEY_RETURN") },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White)
+            ) {
+                Text("Retour")
+            }
+            Button(
+                onClick = { tvWebSocketManager.sendCommand("KEY_POWER") },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2), contentColor = Color.White)
+            ) {
+                Text("Power")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Applications :", style = MaterialTheme.typography.titleSmall, color = Color.White)
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { tvWebSocketManager.sendNetflixCommand() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.Red)
+            ) {
+                Text("Netflix")
+            }
+
+            Button(
+                onClick = { tvWebSocketManager.sendCanalPlusCommand() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+            ) {
+                Text("Canal+")
+            }
+
+            Button(
+                onClick = { tvWebSocketManager.sendPrimeVideoCommand() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2), contentColor = Color.White)
+            ) {
+                Text("Prime Vidéo")
+            }
+
+            Button(
+                onClick = { tvWebSocketManager.sendIPTVCommand() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E44AD), contentColor = Color.White)
+            ) {
+                Text("IPTV")
+            }
+        }
+    }
+}
+
+class TVWebSocketManager(private val tvIp: String, private val name: String = "SamsungRemote") {
     private val client: OkHttpClient
     private var webSocket: WebSocket? = null
     private var token: String? = null
@@ -324,205 +583,6 @@ class TVWebSocketManager(private val tvIp: String, private val name: String = "R
     }
 
     fun isConnected(): Boolean = isConnected
-}
-
-@Composable
-fun TVRemoteScreen(tvWebSocketManager: TVWebSocketManager) {
-    val context = LocalContext.current
-    var connectionStatus by remember { mutableStateOf("Non connecté") }
-    var connectionError by remember { mutableStateOf<String?>(null) }
-    var showControls by remember { mutableStateOf(false) }
-
-    DisposableEffect(Unit) {
-        tvWebSocketManager.setConnectionListener { isConnected, error ->
-            connectionStatus = if (isConnected) "Connecté" else "Non connecté"
-            connectionError = error
-            showControls = isConnected
-        }
-        onDispose { }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Text("Contrôle TV Samsung (WebSocket)", style = MaterialTheme.typography.titleMedium, color = Color.White)
-        Text("Statut : $connectionStatus", style = MaterialTheme.typography.bodyMedium, color = if (connectionStatus == "Connecté") Color.Green else Color.Red)
-
-        if (connectionError != null) {
-            Text("Erreur : $connectionError", style = MaterialTheme.typography.bodySmall, color = Color.Red)
-        }
-
-        Button(
-            onClick = {
-                if (!tvWebSocketManager.isConnected()) {
-                    tvWebSocketManager.connect()
-                    Toast.makeText(context, "Connexion en cours...", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Déjà connecté !", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333), contentColor = Color.White)
-        ) {
-            Text(if (tvWebSocketManager.isConnected()) "Reconnecter" else "Se connecter")
-        }
-
-        if (showControls) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Commandes de base :", style = MaterialTheme.typography.titleSmall, color = Color.White)
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Button(
-                            onClick = { tvWebSocketManager.sendCommand("KEY_VOLDOWN") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                        ) {
-                            Text("Volume -")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { tvWebSocketManager.sendCommand("KEY_VOLUP") },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                        ) {
-                            Text("Volume +")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Button(
-                            onClick = { tvWebSocketManager.sendCommand("KEY_UP") },
-                            modifier = Modifier
-                                .width(120.dp)
-                                .height(60.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                        ) {
-                            Text("↑", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Button(
-                                onClick = { tvWebSocketManager.sendCommand("KEY_LEFT") },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(60.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                            ) {
-                                Text("←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Button(
-                                onClick = { tvWebSocketManager.sendCommand("KEY_ENTER") },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(55.dp)
-                                    .padding(top = 5.dp)
-                                    .padding(horizontal = 2.5.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32), contentColor = Color.White)
-                            ) {
-                                Text("OK", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Button(
-                                onClick = { tvWebSocketManager.sendCommand("KEY_RIGHT") },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(60.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                            ) {
-                                Text("→", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Button(
-                            onClick = { tvWebSocketManager.sendCommand("KEY_DOWN") },
-                            modifier = Modifier
-                                .width(120.dp)
-                                .height(60.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White)
-                        ) {
-                            Text("↓", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { tvWebSocketManager.sendCommand("KEY_HOME") },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700), contentColor = Color.Black)
-                ) {
-                    Text("Accueil")
-                }
-                Button(
-                    onClick = { tvWebSocketManager.sendCommand("KEY_RETURN") },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F), contentColor = Color.White)
-                ) {
-                    Text("Retour")
-                }
-                Button(
-                    onClick = { tvWebSocketManager.sendCommand("KEY_POWER") },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2), contentColor = Color.White)
-                ) {
-                    Text("Power")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Applications :", style = MaterialTheme.typography.titleSmall, color = Color.White)
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { tvWebSocketManager.sendNetflixCommand() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.Red)
-                ) {
-                    Text("Netflix")
-                }
-
-                Button(
-                    onClick = { tvWebSocketManager.sendCanalPlusCommand() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
-                ) {
-                    Text("Canal+")
-                }
-
-                Button(
-                    onClick = { tvWebSocketManager.sendPrimeVideoCommand() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2), contentColor = Color.White)
-                ) {
-                    Text("Prime Vidéo")
-                }
-
-                Button(
-                    onClick = { tvWebSocketManager.sendIPTVCommand() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E44AD), contentColor = Color.White)
-                ) {
-                    Text("IPTV")
-                }
-            }
-        }
-    }
 }
 
 @Composable

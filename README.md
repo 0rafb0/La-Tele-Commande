@@ -6,4 +6,4 @@ Application Android (smartphone) permettant de contrôler à distance une Smart 
 4. Faire "Se connecter" permettra de vous connecter à votre TV grâce au WebSocket de cette dernière
 5. Tada ! Vous aurez accès aux boutons pour contrôler votre TV à distance
 
-Application développée avec Android Studio 
+Application développée avec Android Studio en Kotlin

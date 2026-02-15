@@ -6,4 +6,6 @@ Application Android (smartphone) permettant de contrôler à distance une Smart 
 4. Renseigner l'adresse IP de la TV et faire "Se connecter" permettra de vous connecter à votre TV grâce au WebSocket de cette dernière
 5. Tada ! Vous aurez accès aux boutons pour contrôler votre TV à distance
 
+Note : Il faudra peut-être autoriser l'appareil Android sur la TV grâce à la vraie télécommande
+
 Application développée avec Android Studio en Kotlin

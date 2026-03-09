@@ -1,4 +1,6 @@
-La Tele Commande
+<h1>La Tele Commande</h1>
+
+<img src="https://raphinfo.me/pictures/ic_launcher.png" alt="LaTeleCommande" width="200" height="200">
 
 Application Android (smartphone) permettant de contrôler à distance une Smart TV Samsung comme une télécommande et accéder à des raccourcis tels que le volume, les flèches, le bouton OK, Home, Retour et des applications comme Netflix, Canal+, Prime Vidéo et autres
 

@@ -2,7 +2,7 @@
 
 <img src="https://raphinfo.me/pictures/ic_launcher.png" alt="LaTeleCommande" width="200" height="200">
 
-Application Android (smartphone) permettant de contrôler à distance une Smart TV Samsung comme une télécommande et accéder à des raccourcis tels que le volume, les flèches, le bouton OK, Home, Retour et des applications comme Netflix, Canal+, Prime Vidéo et autres
+<p>Application Android (smartphone) permettant de contrôler à distance une Smart TV Samsung comme une télécommande et accéder à des raccourcis tels que le volume, les flèches, le bouton OK, Home, Retour et des applications comme Netflix, Canal+, Prime Vidéo et autres</p>
 
 1. Télécharger le fichier .apk : https://github.com/0rafb0/La-Tele-Commande/releases/download/app/LaTeleCommande.apk
 2. Installer ce fichier LaTeleCommande.apk sur votre smartphone Android
